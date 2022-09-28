@@ -3273,6 +3273,9 @@ void Element::focus(const FocusOptions& options)
     if (!isConnected())
         return;
 
+    if (isSkippedContent())
+        return;
+
     Ref document { this->document() };
     if (document->focusedElement() == this) {
         if (document->page())
@@ -3761,12 +3764,13 @@ bool Element::hasValidStyle() const
 
 bool Element::isFocusableWithoutResolvingFullStyle() const
 {
-    auto isFocusableStyle = [](const RenderStyle* style) {
+    auto isFocusableStyle = [&](const RenderStyle* style) {
         return style
             && style->display() != DisplayType::None
             && style->display() != DisplayType::Contents
             && style->visibility() == Visibility::Visible
-            && !style->effectiveInert();
+            && !style->effectiveInert()
+            && !isSkippedContent();
     };
 
     if (renderStyle() || hasValidStyle())
@@ -5015,6 +5019,58 @@ Element* Element::fromIdentifier(ElementIdentifier identifier)
             return &element;
     }
     return nullptr;
+}
+
+ContentVisibilityData& Element::ensureContentVisibilityData()
+{
+    auto& rareData = ensureElementRareData();
+    if (!rareData.contentVisibilityData())
+        rareData.setContentVisibilityData(makeUnique<ContentVisibilityData>());
+    return *rareData.contentVisibilityData();
+}
+
+ContentVisibilityData* Element::contentVisibilityData() const
+{
+    return hasRareData() ? elementRareData()->contentVisibilityData() : nullptr;
+}
+
+void Element::updateContentVisibilityData(bool shouldSkip, ContentVisibility contentVisibility)
+{
+    if (auto* parent = parentElement())
+        shouldSkip |= parent->isSkippedContent();
+
+    auto& data = ensureContentVisibilityData();
+    data.isSkippedContent = shouldSkip;
+
+    shouldSkip |= contentVisibility == ContentVisibility::Hidden;
+    for (auto& child : childrenOfType<Element>(*this))
+        child.updateContentVisibilityData(shouldSkip, contentVisibility);
+}
+
+void Element::updateContentVisibility(ContentVisibility newContentVisibility)
+{
+    if (!hasRareData() && newContentVisibility == ContentVisibility::Visible)
+        return;
+    auto& data = ensureContentVisibilityData();
+    if (data.contentVisibility == newContentVisibility)
+        return;
+    data.contentVisibility = newContentVisibility;
+    // FIXME: handle c-v: auto.
+    updateContentVisibilityData(false, newContentVisibility);
+}
+
+bool Element::isSkippedContent() const
+{
+    if (auto* data = contentVisibilityData())
+        return data->isSkippedContent;
+    return false;
+}
+
+bool Element::shouldSkipContent() const
+{
+    if (auto* data = contentVisibilityData())
+        return contentVisibilityData()->contentVisibility == ContentVisibility::Hidden;
+    return false;
 }
 
 #if ENABLE(CSS_TYPED_OM)
