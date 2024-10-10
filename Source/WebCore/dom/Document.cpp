@@ -46,6 +46,8 @@
 #include "CachedFrame.h"
 #include "CachedResourceLoader.h"
 #include "CanvasRenderingContext2D.h"
+#include "CaretPosition.h"
+#include "CaretPositionFromPointOptions.h"
 #include "Chrome.h"
 #include "ChromeClient.h"
 #include "Comment.h"
@@ -2090,6 +2092,54 @@ std::optional<BoundaryPoint> Document::caretPositionFromPoint(const LayoutPoint&
         offset = 0;
 
     return { { node.releaseNonNull(), offset } };
+}
+
+RefPtr<CaretPosition> Document::caretPositionFromPoint(double x, double y, CaretPositionFromPointOptions options)
+{
+    if (!hasLivingRenderTree())
+        return nullptr;
+
+    LayoutPoint clientPoint = { x, y };
+
+    LayoutPoint localPoint;
+    RefPtr node = nodeFromPoint(clientPoint, &localPoint, HitTestSource::Script);
+    if (!node)
+        return nullptr;
+
+    updateLayoutIgnorePendingStylesheets();
+
+    CheckedPtr renderer = node->renderer();
+    if (!renderer)
+        return nullptr;
+
+    if (renderer->isSkippedContentRoot())
+        return CaretPosition::create(WTFMove(node), 0);
+
+    auto position = renderer->positionForPoint(localPoint, HitTestSource::Script);
+    if (position.isNull())
+        return nullptr;
+
+    RefPtr anchorNode = position.anchorNode();
+    if (anchorNode->shadowHost()) {
+        if (auto* textFormControl = dynamicDowncast<HTMLTextFormControlElement>(*anchorNode->shadowHost())) {
+            anchorNode = textFormControl;
+            if (!options.shadowRoots.size())
+                return CaretPosition::create(WTFMove(anchorNode), position.offsetInContainerNode());
+        }
+    }
+
+    bool adjustPosition = false;
+    while (anchorNode->isInShadowTree() && !(options.shadowRoots.size() && options.shadowRoots.contains(Ref(anchorNode->treeScope())))) {
+        anchorNode = anchorNode->shadowHost();
+        adjustPosition = true;
+    }
+    if (adjustPosition)
+        position = positionInParentBeforeNode(anchorNode.get());
+
+    position = position.parentAnchoredEquivalent();
+
+    anchorNode = position.anchorNode();
+    return CaretPosition::create(WTFMove(anchorNode), position.offsetInContainerNode());
 }
 
 bool Document::isBodyPotentiallyScrollable(HTMLBodyElement& body)
