@@ -126,8 +126,6 @@ void Navigation::initializeForNewWindow(std::optional<NavigationNavigationType> 
         bool shouldProcessPreviousNavigationEntries = [&]() {
             if (!previousNavigation->m_entries.size())
                 return false;
-            if (navigationType == NavigationNavigationType::Traverse)
-                return false;
             if (!frame()->document()->protectedSecurityOrigin()->isSameOriginAs(previousWindow->document()->protectedSecurityOrigin()))
                 return false;
             return true;
@@ -139,6 +137,14 @@ void Navigation::initializeForNewWindow(std::optional<NavigationNavigationType> 
             if (navigationType == NavigationNavigationType::Reload) {
                 updateForActivation(currentItem.get(), navigationType);
                 return;
+            }
+            if (navigationType == NavigationNavigationType::Traverse) {
+                m_currentEntryIndex = getEntryIndexOfHistoryItem(m_entries, *currentItem);
+                if (m_currentEntryIndex) {
+                    updateForActivation(frame()->history().previousItem(), navigationType);
+                    return;
+                }
+                m_entries = { };
             }
         }
     }
@@ -170,7 +176,6 @@ void Navigation::initializeForNewWindow(std::optional<NavigationNavigationType> 
         items.append(*currentItem);
 
     size_t start = m_entries.size();
-
     for (Ref item : items)
         m_entries.append(NavigationHistoryEntry::create(protectedScriptExecutionContext().get(), WTFMove(item)));
 
@@ -568,6 +573,17 @@ void Navigation::notifyCommittedToEntry(NavigationAPIMethodTracker* apiMethodTra
         apiMethodTracker->committedPromise->resolve<IDLInterface<NavigationHistoryEntry>>(*entry);
 }
 
+void Navigation::updateForMainFrameNavigation(NavigationNavigationType navigationType)
+{
+    if (navigationType == NavigationNavigationType::Push) {
+        RefPtr entry = currentEntry();
+        if (!entry)
+            return;
+        Ref item = *frame()->history().currentItem();
+        entry->setAssociatedHistoryItem(WTFMove(item));
+    }
+}
+
 // https://html.spec.whatwg.org/multipage/nav-history-apis.html#update-the-navigation-api-entries-for-a-same-document-navigation
 void Navigation::updateForNavigation(Ref<HistoryItem>&& item, NavigationNavigationType navigationType)
 {
@@ -592,8 +608,15 @@ void Navigation::updateForNavigation(Ref<HistoryItem>&& item, NavigationNavigati
     } else if (navigationType == NavigationNavigationType::Replace)
         disposedEntries.append(*oldCurrentEntry);
 
-    if (navigationType == NavigationNavigationType::Push || navigationType == NavigationNavigationType::Replace)
+    if (navigationType == NavigationNavigationType::Push || navigationType == NavigationNavigationType::Replace) {
         m_entries[*m_currentEntryIndex] = NavigationHistoryEntry::create(protectedScriptExecutionContext().get(), WTFMove(item));
+        if (navigationType == NavigationNavigationType::Push) {
+            if (frame()->isMainFrame()) {
+                for (RefPtr child = frame()->tree().firstLocalDescendant(); child; child = child->tree().nextLocalSibling())
+                    child->window()->navigation().updateForMainFrameNavigation(navigationType);
+            }
+        }
+    }
 
     if (m_ongoingAPIMethodTracker)
         notifyCommittedToEntry(m_ongoingAPIMethodTracker.get(), currentEntry(), navigationType);

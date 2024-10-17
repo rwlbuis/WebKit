@@ -45,6 +45,7 @@
 #include "FrameLoaderStateMachine.h"
 #include "HTMLFormElement.h"
 #include "HTMLFrameOwnerElement.h"
+#include "HistoryController.h"
 #include "HistoryItem.h"
 #include "InspectorInstrumentation.h"
 #include "LocalDOMWindow.h"
@@ -359,6 +360,19 @@ public:
         }
 
         auto completionHandler = std::exchange(m_completionHandler, nullptr);
+        auto rawEntries = page->checkedBackForward()->allItems();
+        for (size_t i = 0; i < rawEntries.size(); i++) {
+            Ref item = rawEntries[i];
+            auto index = item->children().findIf([&historyItem](const auto& entry) {
+                return entry == historyItem;
+            });
+            if (index != notFound) {
+                if (item->documentSequenceNumber() != page->backForward().currentItem()->documentSequenceNumber()) {
+                    historyItem = item;
+                    break;
+                }
+            }
+        }
         page->goToItem(page->mainFrame(), historyItem, FrameLoadType::IndexedBackForward, ShouldTreatAsContinuingLoad::No);
         completionHandler(ScheduleHistoryNavigationResult::Completed);
     }

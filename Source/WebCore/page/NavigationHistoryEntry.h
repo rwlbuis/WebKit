@@ -58,6 +58,7 @@ public:
     void setState(RefPtr<SerializedScriptValue>&&);
 
     HistoryItem& associatedHistoryItem() const { return m_associatedHistoryItem; }
+    void setAssociatedHistoryItem(Ref<HistoryItem>&& historyItem) { m_associatedHistoryItem = WTFMove(historyItem); }
 
 private:
     NavigationHistoryEntry(ScriptExecutionContext*, Ref<HistoryItem>&&, String urlString, WTF::UUID key, RefPtr<SerializedScriptValue>&& state = { }, WTF::UUID = WTF::UUID::createVersion4());

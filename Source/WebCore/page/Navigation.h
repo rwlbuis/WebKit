@@ -146,6 +146,8 @@ public:
     void updateForReactivation(Vector<Ref<HistoryItem>>& newHistoryItems, HistoryItem& reactivatedItem);
     void updateForActivation(HistoryItem* previousItem, std::optional<NavigationNavigationType>);
 
+    void updateForMainFrameNavigation(NavigationNavigationType);
+
     RefPtr<NavigationActivation> createForPageswapEvent(HistoryItem* newItem, DocumentLoader*);
 
     void abortOngoingNavigationIfNeeded();
