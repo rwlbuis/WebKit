@@ -1,0 +1,9 @@
+[
+    ExportMacro=WEBCORE_EXPORT,
+    Exposed=(Window),
+    TaggedWrapper,
+] interface CaretPosition {
+  readonly attribute Node offsetNode;
+  readonly attribute unsigned long offset;
+  [NewObject] DOMRect? getClientRect();
+};

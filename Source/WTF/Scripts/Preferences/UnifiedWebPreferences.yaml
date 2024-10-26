@@ -1864,6 +1864,20 @@ CaretBrowsingEnabled:
     WebCore:
       default: false
 
+CaretPositionFromPointEnabled:
+  type: bool
+  status: testable
+  category: dom
+  humanReadableName: "CaretPositionFromPoint API"
+  humanReadableDescription: "Enable CaretPositionFromPoint API"
+  defaultValue:
+    WebKitLegacy:
+      default: false
+    WebKit:
+      default: false
+    WebCore:
+      default: false
+
 ChildProcessDebuggabilityEnabled:
   comment: Disables GPU process IPC timeouts
   type: bool
