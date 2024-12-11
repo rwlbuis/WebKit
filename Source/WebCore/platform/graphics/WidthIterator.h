@@ -54,7 +54,7 @@ public:
 
     float maxGlyphBoundingBoxY() const { ASSERT(m_accountForGlyphBounds); return m_maxGlyphBoundingBoxY; }
     float minGlyphBoundingBoxY() const { ASSERT(m_accountForGlyphBounds); return m_minGlyphBoundingBoxY; }
-    float firstGlyphOverflow() const { ASSERT(m_accountForGlyphBounds); return m_firstGlyphOverflow; }
+    float firstGlyphOverflow() const { ASSERT(m_accountForGlyphBounds); return m_firstGlyphOverflow.value_or(0); }
     float lastGlyphOverflow() const { ASSERT(m_accountForGlyphBounds); return m_lastGlyphOverflow; }
 
     const TextRun& run() const { return m_run; }
@@ -109,7 +109,7 @@ private:
     float m_expansionPerOpportunity { 0 };
     float m_maxGlyphBoundingBoxY { std::numeric_limits<float>::lowest() };
     float m_minGlyphBoundingBoxY { std::numeric_limits<float>::max() };
-    float m_firstGlyphOverflow { 0 };
+    std::optional<float> m_firstGlyphOverflow;
     float m_lastGlyphOverflow { 0 };
     TextDirection m_direction { TextDirection::LTR };
     bool m_containsTabs { false };
